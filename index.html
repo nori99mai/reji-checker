@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="レジチェッカー">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>レジチェッカー</title>
+  <style>
+:root {
+  --bg:         #1a1a2e;
+  --bg-card:    #16213e;
+  --bg-input:   #0f3460;
+  --accent:     #00d4aa;
+  --text:       #ffffff;
+  --text-muted: #a0a0b0;
+  --danger:     #ff6b6b;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== ユーザー設定オーバーレイ ===== */
+.user-setup-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  padding-top: calc(24px + env(safe-area-inset-top));
+}
+.user-setup-overlay.hidden { display: none; }
+.user-setup-card {
+  background: var(--bg-card);
+  border-radius: 20px;
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  border: 1px solid rgba(0,212,170,0.2);
+}
+.user-setup-icon { font-size: 48px; margin-bottom: 16px; }
+.user-setup-title { font-size: 22px; font-weight: bold; margin-bottom: 8px; }
+.user-setup-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.6; }
+
+/* ===== ヘッダー ===== */
+.app-header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  height: calc(52px + env(safe-area-inset-top));
+}
+.app-title { font-size: 17px; font-weight: bold; }
+.today-label { font-size: 13px; color: var(--text-muted); }
+
+/* ===== 画面 ===== */
+.screen {
+  display: none;
+  padding: calc(52px + env(safe-area-inset-top) + 16px) 16px calc(72px + env(safe-area-inset-bottom) + 8px);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.screen.active { display: block; }
+
+/* ===== 合計カード ===== */
+.total-card {
+  background: var(--bg-card);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(0,212,170,0.15);
+}
+.total-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.total-label { font-size: 13px; color: var(--text-muted); }
+.total-amount { font-size: 32px; font-weight: bold; color: var(--accent); }
+.person-totals { display: flex; flex-wrap: wrap; gap: 8px; }
+.person-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-input);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 13px;
+}
+.person-name { color: var(--text-muted); }
+.person-amount { color: var(--accent); font-weight: bold; }
+
+/* ===== 入力フォーム ===== */
+.form-card {
+  background: var(--bg-card);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.form-group { margin-bottom: 12px; }
+.form-group:last-of-type { margin-bottom: 16px; }
+.form-label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
+.required { color: var(--danger); }
+.form-control {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 11px 12px;
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.form-control::placeholder { color: var(--text-muted); }
+.form-control:focus { outline: none; border-color: var(--accent); }
+select.form-control {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23a0a0b0' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+.price-input-wrap { display: flex; align-items: center; gap: 8px; }
+.price-input-wrap .form-control { flex: 1; }
+.price-unit { color: var(--text-muted); font-size: 15px; white-space: nowrap; }
+.btn-primary {
+  width: 100%;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  letter-spacing: 3px;
+}
+.btn-primary:active { opacity: 0.75; }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ===== 明細リスト ===== */
+.item-list { display: flex; flex-direction: column; gap: 8px; }
+.item-row {
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 12px 10px 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.item-info { flex: 1; min-width: 0; }
+.item-name {
+  display: block;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.item-meta {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.item-price {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  padding: 4px 6px;
+  opacity: 0.6;
+  line-height: 1;
+}
+.delete-btn:active { opacity: 1; }
+
+/* ===== 履歴 ===== */
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+.history-row {
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 15px 14px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 8px;
+}
+.history-row:active { opacity: 0.7; }
+.history-date { flex: 1; font-size: 15px; }
+.history-total { font-size: 16px; font-weight: bold; color: var(--accent); }
+.history-arrow { color: var(--text-muted); font-size: 20px; margin-left: 4px; }
+
+/* ===== 設定 ===== */
+.settings-section { margin-bottom: 28px; }
+.settings-section-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+.settings-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.settings-item {
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+}
+.settings-item-name { flex: 1; font-size: 15px; }
+.settings-item-actions { display: flex; gap: 4px; }
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 6px 8px;
+  opacity: 0.8;
+  line-height: 1;
+}
+.icon-btn:active { opacity: 1; }
+.icon-btn.danger { opacity: 0.6; }
+.icon-btn.danger:active { opacity: 1; }
+.btn-add {
+  width: 100%;
+  background: none;
+  border: 1px dashed rgba(255,255,255,0.2);
+  border-radius: 10px;
+  color: var(--accent);
+  padding: 11px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.btn-add:active { opacity: 0.7; }
+
+/* ===== ボトムナビ ===== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--bg-card);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+.nav-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 10px 4px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-muted);
+}
+.nav-btn.active { color: var(--accent); }
+.nav-icon { font-size: 22px; line-height: 1; }
+.nav-label { font-size: 11px; }
+
+/* ===== モーダル ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  align-items: flex-end;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--bg-card);
+  border-radius: 18px 18px 0 0;
+  padding: 24px 16px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  width: 100%;
+}
+.modal h3 { font-size: 16px; margin-bottom: 16px; }
+.modal-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.btn-secondary {
+  flex: 1;
+  background: var(--bg-input);
+  border: none;
+  border-radius: 10px;
+  color: var(--text);
+  padding: 13px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.btn-secondary:active { opacity: 0.75; }
+.modal-buttons .btn-primary { flex: 1; letter-spacing: 0; }
+
+/* ===== 日別詳細オーバーレイ ===== */
+.detail-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 150;
+  overflow-y: auto;
+}
+.detail-overlay.active { display: block; }
+.detail-header {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  padding-top: calc(12px + env(safe-area-inset-top));
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-size: 16px;
+  font-weight: bold;
+}
+.detail-close {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 26px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.detail-totals {
+  padding: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.detail-grand-total {
+  font-size: 22px;
+  font-weight: bold;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.detail-list {
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.detail-item-row {
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ===== トースト ===== */
+.toast {
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,212,170,0.92);
+  color: #000;
+  padding: 10px 22px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.25s;
+  z-index: 300;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }
+
+/* ===== 空状態 ===== */
+.empty-message {
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 32px 0;
+}
+  </style>
+</head>
+<body>
+
+  <!-- ユーザー設定オーバーレイ（初回起動時） -->
+  <div id="user-setup-overlay" class="user-setup-overlay">
+    <div class="user-setup-card">
+      <div class="user-setup-icon">🛒</div>
+      <h2 class="user-setup-title">レジチェッカー</h2>
+      <p class="user-setup-desc">このアプリを使う人の名前を<br>入力してください</p>
+      <input type="text" id="user-setup-input" class="form-control" placeholder="例：父、母" style="text-align:center">
+      <button class="btn-primary" onclick="setupUser()" style="margin-top:14px;letter-spacing:0">はじめる</button>
+    </div>
+  </div>
+
+  <!-- ヘッダー -->
+  <header class="app-header">
+    <span class="app-title">🛒 レジチェッカー</span>
+    <span id="today-date-label" class="today-label"></span>
+  </header>
+
+  <!-- 今日の画面 -->
+  <div id="screen-today" class="screen active">
+
+    <div class="total-card">
+      <div class="total-main">
+        <span class="total-label">総合計</span>
+        <span id="grand-total" class="total-amount">¥0</span>
+      </div>
+      <div id="person-totals" class="person-totals"></div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-group">
+        <label class="form-label">商品名 <span class="required">*</span></label>
+        <input type="text" id="input-name" class="form-control" placeholder="例：牛乳">
+      </div>
+      <div class="form-group">
+        <label class="form-label">誰の分か</label>
+        <select id="input-person" class="form-control">
+          <option value="">選択してください</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">購入場所</label>
+        <select id="input-place" class="form-control">
+          <option value="">選択してください</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">金額 <span class="required">*</span></label>
+        <div class="price-input-wrap">
+          <input type="text" id="input-price" class="form-control" placeholder="0" inputmode="numeric" pattern="[0-9]*">
+          <span class="price-unit">円</span>
+        </div>
+      </div>
+      <button id="add-btn" class="btn-primary" onclick="addItem()">追 加 す る</button>
+    </div>
+
+    <div id="item-list" class="item-list"></div>
+  </div>
+
+  <!-- 履歴画面 -->
+  <div id="screen-history" class="screen">
+    <div id="history-list" class="history-list"></div>
+  </div>
+
+  <!-- 設定画面 -->
+  <div id="screen-settings" class="screen">
+    <div class="settings-section">
+      <div class="settings-section-title">使用者</div>
+      <div class="settings-item">
+        <span class="settings-item-name" id="current-user-display"></span>
+        <div class="settings-item-actions">
+          <button class="icon-btn" onclick="openChangeUserModal()">✏️</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">誰の分か</div>
+      <div id="persons-list" class="settings-list"></div>
+      <button class="btn-add" onclick="openAddModal('person')">＋ 追加する</button>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-title">購入場所</div>
+      <div id="places-list" class="settings-list"></div>
+      <button class="btn-add" onclick="openAddModal('place')">＋ 追加する</button>
+    </div>
+  </div>
+
+  <!-- ボトムナビ -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" onclick="showScreen('today')" id="nav-today">
+      <span class="nav-icon">🛒</span>
+      <span class="nav-label">今日</span>
+    </button>
+    <button class="nav-btn" onclick="showScreen('history')" id="nav-history">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">履歴</span>
+    </button>
+    <button class="nav-btn" onclick="showScreen('settings')" id="nav-settings">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">設定</span>
+    </button>
+  </nav>
+
+  <!-- モーダル（追加・編集・使用者変更） -->
+  <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal">
+      <h3 id="modal-title">追加</h3>
+      <input type="text" id="modal-input" class="form-control" placeholder="名前を入力">
+      <div class="modal-buttons">
+        <button class="btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button class="btn-primary" onclick="saveModal()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 日別詳細オーバーレイ -->
+  <div id="detail-overlay" class="detail-overlay">
+    <div class="detail-header">
+      <button class="detail-close" onclick="closeDetail()">×</button>
+      <span id="detail-date-label"></span>の内訳
+    </div>
+    <div id="detail-totals" class="detail-totals"></div>
+    <div id="detail-list" class="detail-list"></div>
+  </div>
+
+  <!-- トースト -->
+  <div id="toast" class="toast"></div>
+
+<script>
+// ===== ユーザー管理 =====
+const USER_STORAGE_KEY = 'reji-checker-user';
+let currentUser = '';
+
+function setupUser() {
+  const input = document.getElementById('user-setup-input');
+  const name  = input.value.trim();
+  if (!name) { showToast('名前を入力してください'); return; }
+  localStorage.setItem(USER_STORAGE_KEY, name);
+  currentUser = name;
+  document.getElementById('user-setup-overlay').classList.add('hidden');
+  initApp();
+}
+
+function openChangeUserModal() {
+  _modalType      = 'user';
+  _modalEditIndex = -1;
+  document.getElementById('modal-title').textContent = '使用者を変更';
+  document.getElementById('modal-input').value       = currentUser;
+  document.getElementById('modal-overlay').classList.add('active');
+  setTimeout(() => document.getElementById('modal-input').focus(), 100);
+}
+
+// ===== DB設定 =====
+const DB_VERSION = 1;
+let db = null;
+
+function getDBName() {
+  return 'reji-checker-' + currentUser;
+}
+
+async function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(getDBName(), DB_VERSION);
+
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('items')) {
+        const store = d.createObjectStore('items', { keyPath: 'id' });
+        store.createIndex('date',      'date',      { unique: false });
+        store.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('settings')) {
+        d.createObjectStore('settings', { keyPath: 'key' });
+      }
+    };
+
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror   = (e) => reject(e.target.error);
+  });
+}
+
+// ===== DB汎用操作 =====
+function dbGet(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+function dbPut(store, value) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).put(value);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+function dbDelete(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+function dbGetAll(store) {
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+function dbGetByIndex(store, indexName, value) {
+  return new Promise((resolve, reject) => {
+    const tx    = db.transaction(store, 'readonly');
+    const index = tx.objectStore(store).index(indexName);
+    const req   = index.getAll(value);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+// ===== 自動消去（1ヶ月超データを削除） =====
+async function autoCleanup() {
+  const cutoff   = Date.now() - (30 * 24 * 60 * 60 * 1000);
+  const allItems = await dbGetAll('items');
+  for (const item of allItems) {
+    if (item.createdAt < cutoff) await dbDelete('items', item.id);
+  }
+}
+
+// ===== グローバル状態 =====
+let persons    = [];
+let places     = [];
+let todayItems = [];
+let _toastTimer = null;
+
+// ===== 設定 =====
+async function loadSettings() {
+  const pData = await dbGet('settings', 'persons');
+  const lData = await dbGet('settings', 'places');
+
+  persons = pData ? pData.value : ['父', '母', '長女', '次女'];
+  places  = lData ? lData.value : ['マックスバリュ', 'イオン', 'ダイソー', 'セリア'];
+
+  if (!pData) await dbPut('settings', { key: 'persons', value: persons });
+  if (!lData) await dbPut('settings', { key: 'places',  value: places  });
+}
+
+function updateSelects() {
+  const pSel = document.getElementById('input-person');
+  const lSel = document.getElementById('input-place');
+  const pVal = pSel.value;
+  const lVal = lSel.value;
+
+  pSel.innerHTML = '<option value="">選択してください</option>' +
+    persons.map(p => `<option value="${escapeHtml(p)}"${p === pVal ? ' selected' : ''}>${escapeHtml(p)}</option>`).join('');
+
+  lSel.innerHTML = '<option value="">選択してください</option>' +
+    places.map(p => `<option value="${escapeHtml(p)}"${p === lVal ? ' selected' : ''}>${escapeHtml(p)}</option>`).join('');
+}
+
+// ===== 今日の画面 =====
+function getTodayStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+async function loadTodayItems() {
+  todayItems = await dbGetByIndex('items', 'date', getTodayStr());
+  todayItems.sort((a, b) => a.createdAt - b.createdAt);
+  renderTodayTotals();
+  renderTodayItems();
+}
+
+function renderTodayTotals() {
+  const grandTotal = todayItems.reduce((s, i) => s + i.price, 0);
+  document.getElementById('grand-total').textContent = formatPrice(grandTotal);
+
+  const personMap = {};
+  todayItems.forEach(item => {
+    if (item.person) personMap[item.person] = (personMap[item.person] || 0) + item.price;
+  });
+
+  const el = document.getElementById('person-totals');
+  const entries = Object.entries(personMap);
+  if (entries.length === 0) { el.innerHTML = ''; return; }
+
+  el.innerHTML = entries.map(([name, amount]) =>
+    `<span class="person-chip"><span class="person-name">${escapeHtml(name)}</span><span class="person-amount">${formatPrice(amount)}</span></span>`
+  ).join('');
+}
+
+function renderTodayItems() {
+  const el = document.getElementById('item-list');
+  if (todayItems.length === 0) {
+    el.innerHTML = '<div class="empty-message">まだ商品が追加されていません</div>';
+    return;
+  }
+  el.innerHTML = todayItems.map(item => {
+    const meta = [item.person, item.place].filter(Boolean).map(escapeHtml).join(' · ');
+    return `
+      <div class="item-row">
+        <div class="item-info">
+          <span class="item-name">${escapeHtml(item.name)}</span>
+          ${meta ? `<span class="item-meta">${meta}</span>` : ''}
+        </div>
+        <span class="item-price">${formatPrice(item.price)}</span>
+        <button class="delete-btn" onclick="deleteItem('${item.id}')">🗑️</button>
+      </div>`;
+  }).join('');
+}
+
+async function addItem() {
+  const name     = document.getElementById('input-name').value.trim();
+  const person   = document.getElementById('input-person').value;
+  const place    = document.getElementById('input-place').value;
+  const priceRaw = document.getElementById('input-price').value;
+  const price    = parseInt(priceRaw, 10);
+
+  if (!name)                                   { showToast('商品名を入力してください'); return; }
+  if (!priceRaw || isNaN(price) || price <= 0) { showToast('金額を入力してください'); return; }
+
+  const btn = document.getElementById('add-btn');
+  btn.disabled = true;
+  try {
+    await dbPut('items', {
+      id: generateId(), date: getTodayStr(),
+      name, person, place, price, createdAt: Date.now()
+    });
+    document.getElementById('input-name').value  = '';
+    document.getElementById('input-price').value = '';
+    await loadTodayItems();
+    showToast('追加しました ✓');
+  } catch (err) {
+    console.error(err);
+    showToast('追加に失敗しました');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteItem(id) {
+  try {
+    await dbDelete('items', id);
+    await loadTodayItems();
+    showToast('削除しました');
+  } catch (err) {
+    console.error(err);
+    showToast('削除に失敗しました');
+  }
+}
+
+// ===== 履歴画面 =====
+async function loadHistory() {
+  try {
+    const allItems = await dbGetAll('items');
+    const dateMap  = {};
+    allItems.forEach(item => {
+      if (!dateMap[item.date]) dateMap[item.date] = [];
+      dateMap[item.date].push(item);
+    });
+
+    const dates = Object.keys(dateMap).sort((a, b) => b.localeCompare(a));
+    const el    = document.getElementById('history-list');
+
+    if (dates.length === 0) {
+      el.innerHTML = '<div class="empty-message">履歴がありません</div>';
+      return;
+    }
+
+    el.innerHTML = dates.map(date => {
+      const total = dateMap[date].reduce((s, i) => s + i.price, 0);
+      return `
+        <div class="history-row" onclick="showDayDetail('${date}')">
+          <span class="history-date">${formatDate(date)}</span>
+          <span class="history-total">${formatPrice(total)}</span>
+          <span class="history-arrow">›</span>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    console.error(err);
+    showToast('履歴の読み込みに失敗しました');
+  }
+}
+
+async function showDayDetail(date) {
+  try {
+    const items = await dbGetByIndex('items', 'date', date);
+    items.sort((a, b) => a.createdAt - b.createdAt);
+
+    const grandTotal = items.reduce((s, i) => s + i.price, 0);
+    const personMap  = {};
+    items.forEach(item => {
+      if (item.person) personMap[item.person] = (personMap[item.person] || 0) + item.price;
+    });
+
+    document.getElementById('detail-date-label').textContent = formatDate(date);
+
+    const personChips = Object.entries(personMap).map(([name, amount]) =>
+      `<span class="person-chip"><span class="person-name">${escapeHtml(name)}</span><span class="person-amount">${formatPrice(amount)}</span></span>`
+    ).join('');
+
+    document.getElementById('detail-totals').innerHTML =
+      `<div class="detail-grand-total">総合計: ${formatPrice(grandTotal)}</div>` +
+      (personChips ? `<div class="person-totals">${personChips}</div>` : '');
+
+    document.getElementById('detail-list').innerHTML = items.map(item => {
+      const meta = [item.person, item.place].filter(Boolean).map(escapeHtml).join(' · ');
+      return `
+        <div class="detail-item-row">
+          <div class="item-info">
+            <span class="item-name">${escapeHtml(item.name)}</span>
+            ${meta ? `<span class="item-meta">${meta}</span>` : ''}
+          </div>
+          <span class="item-price">${formatPrice(item.price)}</span>
+        </div>`;
+    }).join('');
+
+    document.getElementById('detail-overlay').classList.add('active');
+  } catch (err) {
+    console.error(err);
+    showToast('詳細の表示に失敗しました');
+  }
+}
+
+function closeDetail() {
+  document.getElementById('detail-overlay').classList.remove('active');
+}
+
+// ===== 設定画面 =====
+function renderSettings() {
+  document.getElementById('current-user-display').textContent = currentUser;
+  renderSettingsList('persons-list', persons, 'person');
+  renderSettingsList('places-list',  places,  'place');
+}
+
+function renderSettingsList(containerId, items, type) {
+  const el = document.getElementById(containerId);
+  if (items.length === 0) {
+    el.innerHTML = '<div class="empty-message">項目がありません</div>';
+    return;
+  }
+  el.innerHTML = items.map((name, idx) => `
+    <div class="settings-item">
+      <span class="settings-item-name">${escapeHtml(name)}</span>
+      <div class="settings-item-actions">
+        <button class="icon-btn" onclick="openEditModal('${type}', ${idx})">✏️</button>
+        <button class="icon-btn danger" onclick="deleteSettingsItem('${type}', ${idx})">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+
+// ===== モーダル =====
+let _modalType      = null;
+let _modalEditIndex = -1;
+
+function openAddModal(type) {
+  _modalType      = type;
+  _modalEditIndex = -1;
+  document.getElementById('modal-title').textContent =
+    type === 'person' ? '誰の分かを追加' : '購入場所を追加';
+  document.getElementById('modal-input').value = '';
+  document.getElementById('modal-overlay').classList.add('active');
+  setTimeout(() => document.getElementById('modal-input').focus(), 100);
+}
+
+function openEditModal(type, idx) {
+  _modalType      = type;
+  _modalEditIndex = idx;
+  const items = type === 'person' ? persons : places;
+  document.getElementById('modal-title').textContent =
+    type === 'person' ? '誰の分かを編集' : '購入場所を編集';
+  document.getElementById('modal-input').value = items[idx];
+  document.getElementById('modal-overlay').classList.add('active');
+  setTimeout(() => document.getElementById('modal-input').focus(), 100);
+}
+
+function closeModal(event) {
+  if (event && event.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('active');
+}
+
+async function saveModal() {
+  const value = document.getElementById('modal-input').value.trim();
+  if (!value) { showToast('名前を入力してください'); return; }
+
+  // 使用者変更
+  if (_modalType === 'user') {
+    if (value !== currentUser) {
+      localStorage.setItem(USER_STORAGE_KEY, value);
+      currentUser = value;
+      db = null;
+      document.getElementById('modal-overlay').classList.remove('active');
+      await initApp();
+      showToast('使用者を変更しました ✓');
+    } else {
+      document.getElementById('modal-overlay').classList.remove('active');
+    }
+    return;
+  }
+
+  const items = _modalType === 'person' ? persons : places;
+
+  const isDuplicate = items.some((name, idx) => name === value && idx !== _modalEditIndex);
+  if (isDuplicate) { showToast('すでに登録済みです'); return; }
+
+  const newItems = [...items];
+  if (_modalEditIndex >= 0) {
+    newItems[_modalEditIndex] = value;
+  } else {
+    newItems.push(value);
+  }
+
+  try {
+    const key = _modalType === 'person' ? 'persons' : 'places';
+    await dbPut('settings', { key, value: newItems });
+    if (_modalType === 'person') persons = newItems; else places = newItems;
+
+    document.getElementById('modal-overlay').classList.remove('active');
+    renderSettings();
+    updateSelects();
+    showToast('保存しました ✓');
+  } catch (err) {
+    console.error(err);
+    showToast('保存に失敗しました');
+  }
+}
+
+async function deleteSettingsItem(type, idx) {
+  const items    = type === 'person' ? persons : places;
+  const newItems = [...items];
+  newItems.splice(idx, 1);
+
+  try {
+    const key = type === 'person' ? 'persons' : 'places';
+    await dbPut('settings', { key, value: newItems });
+    if (type === 'person') persons = newItems; else places = newItems;
+    renderSettings();
+    updateSelects();
+    showToast('削除しました');
+  } catch (err) {
+    console.error(err);
+    showToast('削除に失敗しました');
+  }
+}
+
+// ===== 画面切替 =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-' + id).classList.add('active');
+
+  if (id === 'history')  loadHistory();
+  if (id === 'settings') renderSettings();
+}
+
+// ===== ユーティリティ =====
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g,  '&amp;')
+    .replace(/</g,  '&lt;')
+    .replace(/>/g,  '&gt;')
+    .replace(/"/g,  '&quot;')
+    .replace(/'/g,  '&#39;');
+}
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function formatDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const day = ['日','月','火','水','木','金','土'][new Date(y, m - 1, d).getDay()];
+  return `${m}月${d}日（${day}）`;
+}
+
+function formatPrice(n) {
+  return '¥' + n.toLocaleString();
+}
+
+// ===== 初期化 =====
+async function initApp() {
+  try {
+    db = await openDB();
+    await autoCleanup();
+    await loadSettings();
+    updateSelects();
+    await loadTodayItems();
+    renderSettings();
+  } catch (err) {
+    console.error(err);
+    showToast('初期化エラーが発生しました');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const now  = new Date();
+  const days = ['日','月','火','水','木','金','土'];
+  document.getElementById('today-date-label').textContent =
+    `今日: ${now.getMonth() + 1}月${now.getDate()}日（${days[now.getDay()]}）`;
+
+  currentUser = localStorage.getItem(USER_STORAGE_KEY) || '';
+  if (!currentUser) {
+    return; // ユーザー設定オーバーレイを表示したまま待機
+  }
+  document.getElementById('user-setup-overlay').classList.add('hidden');
+  initApp();
+});
+
+// Enterキーでセットアップ・モーダル保存
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  if (!document.getElementById('user-setup-overlay').classList.contains('hidden')) {
+    setupUser();
+  } else if (document.getElementById('modal-overlay').classList.contains('active')) {
+    saveModal();
+  }
+});
+</script>
+</body>
+</html>
